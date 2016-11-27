@@ -1,0 +1,4 @@
+cafmalWorker:
+  cron: "* * * * *"
+  class: "CafmalWorker"
+  queue: default
