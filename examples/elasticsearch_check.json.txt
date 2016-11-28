@@ -1,0 +1,28 @@
+# Elasticsearch check example
+This is an example check for elasticsearch. This check will search in all indices
+for entries with type:sysqlog. It will also filter the result to only show the
+last 24 hours.
+
+    {
+      "query": {
+        "bool": {
+          "must": {
+            "wildcard": { "type": "syslog" }
+          },
+          "filter": {
+            "range" : {
+              "@timestamp" : {
+                "gte" : "now-1d",
+                "lt" :  "now"
+              }
+            }
+          }
+        }
+      }
+    }
+
+To use this check in cafmal, you have to:
+ - Add an elasticsearch datasource
+ - Define a check to that datasource
+ - Paste the upper part into the condition_query.
+ - Use agg_sum as condition aggregator

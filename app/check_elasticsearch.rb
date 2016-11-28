@@ -8,9 +8,16 @@ class CheckElasticsearch < CheckInterface
     #@TODO username + pw support
     es_url = @protocol + @address + ':' + @port.to_s + '/' + @index
     client = Elasticsearch::Client.new url: es_url
+
+    # prepare query
+    query = @condition_query
+    query.delete!("\n")
+    query.delete!("\r")
+
     case @condition_aggregator
     when 'agg_sum'
-      result_from_es = client.count q: @condition_query
+      #@TODO add index here, simple index: @index, does not work, as wildcards are not supported
+      result_from_es = client.count body: query
     end
 
     case @condition_operand

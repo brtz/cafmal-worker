@@ -88,7 +88,19 @@ class CafmalWorker
           datasource_to_use['password']
         )
         result = check_to_perform.execute
-        p result
+
+        if result['bool']
+          event = Cafmal::Event.new(api_url, auth.token)
+          params_to_e = {}
+          params_to_e['team_id'] = check['team_id']
+          params_to_e['name'] = check['name']
+          params_to_e['message'] = result['message']
+          params_to_e['kind'] = 'check'
+          params_to_e['severity'] = check['severity']
+
+          create_event_response = event.create(params_to_e)
+          logger.info "Created new event: #{JSON.parse(create_event_response)['id']}"
+        end
       rescue Exception => e
         logger.error "Check failed! #{check} | #{e.inspect}"
         #@TODO sent event
