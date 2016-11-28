@@ -81,13 +81,15 @@ class CafmalWorker
           datasource_to_use['protocol'],
           datasource_to_use['index'],
           check['condition_query'],
-          check['condition_operand'],
+          check['condition_operator'],
           check['condition_aggregator'],
           check['condition_value'],
           datasource_to_use['username'],
           datasource_to_use['password']
         )
         result = check_to_perform.execute
+
+        logger.info result
 
         if result['bool']
           event = Cafmal::Event.new(api_url, auth.token)

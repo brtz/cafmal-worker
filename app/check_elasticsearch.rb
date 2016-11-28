@@ -15,19 +15,13 @@ class CheckElasticsearch < CheckInterface
     query.delete!("\r")
 
     case @condition_aggregator
-    when 'agg_sum'
+    when 'elasticsearch_count'
       #@TODO add index here, simple index: @index, does not work, as wildcards are not supported
       result_from_es = client.count body: query
     end
 
-    case @condition_operand
-    when '>'
-      result['bool'] = result_from_es['count'] > @condition_value
-      result['message'] = "count on elasticsearch: #{result_from_es['count']} > #{@condition_value}"
-    when '<'
-      result['bool'] = result_from_es['count'] < @condition_value
-      result['message'] = "count on elasticsearch: #{result_from_es['count']} < #{@condition_value}"
-    end
+    result['bool'] = result_from_es['count'].send(@condition_operator, @condition_value)
+    result['message'] = "count on elasticsearch: #{result_from_es['count']} #{@condition_operator} #{@condition_value}"
 
     return result
 

@@ -4,7 +4,7 @@ class CheckInterface
   @protocol = nil
   @index = nil
   @condition_query = nil
-  @condition_operand = nil
+  @condition_operator = nil
   @condition_aggregator = nil
   @condition_value = nil
   @username = nil
@@ -16,7 +16,7 @@ class CheckInterface
     protocol,
     index,
     condition_query,
-    condition_operand,
+    condition_operator,
     condition_aggregator,
     condition_value,
     username = "",
@@ -27,8 +27,18 @@ class CheckInterface
   @protocol = protocol
   @index = index
   @condition_query = condition_query
-  @condition_operand = '>' if (condition_operand == 'greaterThan')
-  @condition_operand = '<' if (condition_operand == 'lowerThan')
+  case condition_operator
+  when 'lowerThan'
+    @condition_operator = '<'
+  when 'greaterThan'
+    @condition_operator = '>'
+  when 'lowerThanOrEqual'
+    @condition_operator = '<='
+  when 'greaterThanOrEqual'
+    @condition_operator = '>='
+  when 'equal'
+    @condition_operator = '=='
+  end
   @condition_aggregator = condition_aggregator
   @condition_value = condition_value
 
