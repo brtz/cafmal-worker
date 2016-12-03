@@ -5,10 +5,10 @@ require 'json'
 
 Sidekiq.configure_server do |config|
   config.redis = {
-    host: "redis" || ENV["CAFMAL-WORKER_CACHE_HOST"],
-    port: 6379 || ENV["CAFMAL-WORKER_CACHE_PORT"].to_i,
-    db: 0 || ENV["CAFMAL-WORKER_CACHE_DB"].to_i,
-    password: "foobar" || ENV["CAFMAL-WORKER_CACHE_PASSWORD"],
+    host: "redis" || ENV["CAFMAL_WORKER_CACHE_HOST"],
+    port: 6379 || ENV["CAFMAL_WORKER_CACHE_PORT"].to_i,
+    db: 0 || ENV["CAFMAL_WORKER_CACHE_DB"].to_i,
+    password: "foobar" || ENV["CAFMAL_WORKER_CACHE_PASSWORD"],
     namespace: "worker"
   }
 end
@@ -25,12 +25,35 @@ class CafmalWorker
 
   def perform()
     api_url = ENV['CAFMAL_API_URL']
+    uuid = ENV['CAFMAL_WORKER_UUID']
     email = 'worker@example.com' || ENV['CAFMAL_WORKER_EMAIL']
     password = 'barfoo' || ENV['CAFMAL_WORKER_PASSOWRD']
     checks_to_run = []
 
     auth = Cafmal::Auth.new(ENV['CAFMAL_API_URL'])
     auth.login(email, password)
+
+    # register worker (update if already registered)
+    existing_worker_id = nil
+    worker = Cafmal::Worker.new(api_url, auth.token)
+    workers = JSON.parse(worker.list(api_url, auth.token))
+    workers.each do |found_worker|
+      if found_worker['uuid'] == uuid
+        existing_worker_id = found_worker['id']
+        break;
+      end
+    end
+
+    params_to_w = {}
+    params_to_w['uuid'] = uuid
+    params_to_w['heartbeat_received_at'] = DateTime.now.new_offset(0)
+    if existing_worker_id.nil?
+      create_worker_response = worker.create(params_to_w)
+    else
+      params_to_w['id'] = existing_worker_id
+      create_worker_response = worker.update(params_to_w)
+    end
+    logger.info "Registered worker: #{JSON.parse(create_worker_response)['id']}"
 
     # get all the checks
     check = Cafmal::Check.new(api_url, auth.token)
@@ -99,13 +122,23 @@ class CafmalWorker
           params_to_e['message'] = result['message']
           params_to_e['kind'] = 'check'
           params_to_e['severity'] = check['severity']
+          params_to_e['metric'] = result['metric'].to_s
 
           create_event_response = event.create(params_to_e)
           logger.info "Created new event: #{JSON.parse(create_event_response)['id']}"
         end
       rescue Exception => e
         logger.error "Check failed! #{check} | #{e.inspect}"
-        #@TODO sent event
+        event = Cafmal::Event.new(api_url, auth.token)
+        params_to_e = {}
+        params_to_e['team_id'] = check['team_id']
+        params_to_e['name'] = 'check_failed'
+        params_to_e['message'] = "Check #{check['name']} failed execute"
+        params_to_e['kind'] = 'check'
+        params_to_e['severity'] = 'error'
+
+        create_event_response = event.create(params_to_e)
+        logger.info "Created new event: #{JSON.parse(create_event_response)['id']}"
       end
 
       params['is_locked'] = false

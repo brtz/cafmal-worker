@@ -6,7 +6,7 @@ class CheckElasticsearch < CheckInterface
     result = {}
 
     #@TODO username + pw support
-    es_url = @protocol + @address + ':' + @port.to_s + '/' + @index
+    es_url = @protocol + @address + ':' + @port.to_s + '/'
     client = Elasticsearch::Client.new url: es_url
 
     # prepare query
@@ -16,12 +16,16 @@ class CheckElasticsearch < CheckInterface
 
     case @condition_aggregator
     when 'elasticsearch_count'
-      #@TODO add index here, simple index: @index, does not work, as wildcards are not supported
-      result_from_es = client.count body: query
+      if @index.nil?
+        result_from_es = client.count index: "#{@index}", body: query
+      else
+        result_from_es = client.count body: query
+      end
     end
 
     result['bool'] = result_from_es['count'].send(@condition_operator, @condition_value)
     result['message'] = "count on elasticsearch: #{result_from_es['count']} #{@condition_operator} #{@condition_value}"
+    result['metric'] = result_from_es['count']
 
     return result
 

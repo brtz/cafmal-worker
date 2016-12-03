@@ -22,25 +22,30 @@ class CheckInterface
     username = "",
     password = ""
   )
-  @address = address
-  @port = port
-  @protocol = protocol
-  @index = index
-  @condition_query = condition_query
-  case condition_operator
-  when 'lowerThan'
-    @condition_operator = '<'
-  when 'greaterThan'
-    @condition_operator = '>'
-  when 'lowerThanOrEqual'
-    @condition_operator = '<='
-  when 'greaterThanOrEqual'
-    @condition_operator = '>='
-  when 'equal'
-    @condition_operator = '=='
-  end
-  @condition_aggregator = condition_aggregator
-  @condition_value = condition_value
+
+    @address = address
+    @port = port
+    @protocol = protocol
+    @index = index
+    @condition_query = condition_query
+
+    case condition_operator
+    when 'lowerThan'
+      @condition_operator = '<'
+    when 'greaterThan'
+      @condition_operator = '>'
+    when 'lowerThanOrEqual'
+      @condition_operator = '<='
+    when 'greaterThanOrEqual'
+      @condition_operator = '>='
+    when 'equal'
+      @condition_operator = '=='
+    when 'notEqual'
+      @condition_operator = '!='
+    end
+
+    @condition_aggregator = condition_aggregator
+    @condition_value = condition_value
 
   end
 
