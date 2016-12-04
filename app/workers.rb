@@ -7,6 +7,7 @@ require 'json'
 missing_env_vars = []
 missing_env_vars.push('CAFMAL_API_URL') if ENV['CAFMAL_API_URL'].nil?
 missing_env_vars.push('CAFMAL_WORKER_UUID') if ENV['CAFMAL_WORKER_UUID'].nil?
+missing_env_vars.push('CAFMAL_WORKER_DATASOURCE_ID') if ENV['CAFMAL_WORKER_DATASOURCE_ID'].nil?
 missing_env_vars.push('CAFMAL_WORKER_EMAIL') if ENV['CAFMAL_WORKER_EMAIL'].nil?
 missing_env_vars.push('CAFMAL_WORKER_PASSWORD') if ENV['CAFMAL_WORKER_PASSWORD'].nil?
 abort "Missing required env vars! (#{missing_env_vars.join(',')})" if missing_env_vars.length > 0
@@ -108,7 +109,7 @@ class CafmalWorker
           datasource_to_use['address'],
           datasource_to_use['port'],
           datasource_to_use['protocol'],
-          datasource_to_use['index'],
+          check['index'],
           check['condition_query'],
           check['condition_operator'],
           check['condition_aggregator'],
@@ -139,7 +140,7 @@ class CafmalWorker
         params_to_e = {}
         params_to_e['team_id'] = check['team_id']
         params_to_e['name'] = 'check_failed'
-        params_to_e['message'] = "Check #{check['name']} failed execute"
+        params_to_e['message'] = "Check #{check['name']} failed: #{e.inspect}"
         params_to_e['kind'] = 'check'
         params_to_e['severity'] = 'error'
 

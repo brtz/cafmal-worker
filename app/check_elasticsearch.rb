@@ -16,7 +16,7 @@ class CheckElasticsearch < CheckInterface
 
     case @condition_aggregator
     when 'elasticsearch_count'
-      if @index.nil?
+      if !@index.nil?
         result_from_es = client.count index: "#{@index}", body: query
       else
         result_from_es = client.count body: query
