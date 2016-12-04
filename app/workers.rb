@@ -3,19 +3,22 @@ require 'sidekiq-cron'
 require 'cafmal'
 require 'json'
 
+# check required envs
+missing_env_vars = []
+missing_env_vars.push('CAFMAL_API_URL') if ENV['CAFMAL_API_URL'].nil?
+missing_env_vars.push('CAFMAL_WORKER_UUID') if ENV['CAFMAL_WORKER_UUID'].nil?
+missing_env_vars.push('CAFMAL_WORKER_EMAIL') if ENV['CAFMAL_WORKER_EMAIL'].nil?
+missing_env_vars.push('CAFMAL_WORKER_PASSWORD') if ENV['CAFMAL_WORKER_PASSWORD'].nil?
+abort "Missing required env vars! (#{missing_env_vars.join(',')})" if missing_env_vars.length > 0
+
 Sidekiq.configure_server do |config|
   config.redis = {
-    host: "redis" || ENV["CAFMAL_WORKER_CACHE_HOST"],
-    port: 6379 || ENV["CAFMAL_WORKER_CACHE_PORT"].to_i,
-    db: 0 || ENV["CAFMAL_WORKER_CACHE_DB"].to_i,
-    password: "foobar" || ENV["CAFMAL_WORKER_CACHE_PASSWORD"],
+    host: "redis" || ENV['CAFMAL_WORKER_CACHE_HOST'],
+    port: 6379 || ENV['CAFMAL_WORKER_CACHE_PORT'].to_i,
+    db: 0 || ENV['CAFMAL_WORKER_CACHE_DB'].to_i,
+    password: "foobar" || ENV['CAFMAL_WORKER_CACHE_PASSWORD'],
     namespace: "worker"
   }
-end
-
-schedule_file = "config/schedule.yml"
-if File.exists?(schedule_file) && Sidekiq.server?
-  Sidekiq::Cron::Job.load_from_hash YAML.load_file(schedule_file)
 end
 
 class CafmalWorker
@@ -23,14 +26,16 @@ class CafmalWorker
   require './app/check_elasticsearch'
   require './app/check_influxdb'
 
-  def perform()
-    api_url = ENV['CAFMAL_API_URL']
-    uuid = ENV['CAFMAL_WORKER_UUID']
-    email = 'worker@example.com' || ENV['CAFMAL_WORKER_EMAIL']
-    password = 'barfoo' || ENV['CAFMAL_WORKER_PASSOWRD']
+  def perform(*args)
+    api_url = args[0]['api_url']
+    uuid = args[0]['uuid']
+    datasource_id = args[0]['datasource_id'].to_i
+    email = args[0]['email']
+    password = args[0]['password']
+
     checks_to_run = []
 
-    auth = Cafmal::Auth.new(ENV['CAFMAL_API_URL'])
+    auth = Cafmal::Auth.new(api_url)
     auth.login(email, password)
 
     # register worker (update if already registered)
@@ -53,16 +58,17 @@ class CafmalWorker
       params_to_w['id'] = existing_worker_id
       create_worker_response = worker.update(params_to_w)
     end
-    logger.info "Registered worker: #{JSON.parse(create_worker_response)['id']}"
+    logger.info "Registered worker (#{uuid},#{datasource_id}): #{JSON.parse(create_worker_response)['id']}"
 
     # get all the checks
     check = Cafmal::Check.new(api_url, auth.token)
     checks = JSON.parse(check.list)
 
-    # filter deleted_at
+    # filter
     checks.each do |check|
       check['last_ran_at'] = DateTime.now.new_offset(0) if check['last_ran_at'].nil?
 
+      next if check['datasource_id'] != datasource_id
       next unless check['deleted_at'].nil?
       next if check['is_locked']
       next if DateTime.parse(check['last_ran_at']) + Rational(check['interval'], 86400) >= DateTime.now.new_offset(0)
@@ -157,3 +163,16 @@ class CafmalWorker
   end
 
 end
+
+Sidekiq::Cron::Job.create(
+  name: "cafmalWorker-#{ENV['CAFMAL_WORKER_UUID']}",
+  cron: '*/30 * * * * *',
+  class: 'CafmalWorker',
+  args: {
+    api_url: ENV['CAFMAL_API_URL'],
+    uuid: ENV['CAFMAL_WORKER_UUID'],
+    datasource_id: ENV['CAFMAL_WORKER_DATASOURCE_ID'],
+    email: ENV['CAFMAL_WORKER_EMAIL'],
+    password: ENV['CAFMAL_WORKER_PASSWORD']
+  }
+)
