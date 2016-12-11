@@ -1,5 +1,6 @@
 require 'sidekiq'
 require 'sidekiq-cron'
+require 'sidekiq-limit_fetch'
 require 'cafmal'
 require 'json'
 
@@ -169,6 +170,7 @@ Sidekiq::Cron::Job.create(
   name: "cafmalWorker-#{ENV['CAFMAL_WORKER_UUID']}",
   cron: '*/30 * * * * *',
   class: 'CafmalWorker',
+  queue: "cafmalQueue-#{ENV['CAFMAL_WORKER_DATASOURCE_ID']}",
   args: {
     api_url: ENV['CAFMAL_API_URL'],
     uuid: ENV['CAFMAL_WORKER_UUID'],
@@ -177,3 +179,5 @@ Sidekiq::Cron::Job.create(
     password: ENV['CAFMAL_WORKER_PASSWORD']
   }
 )
+
+Sidekiq::Queue["cafmalQueue-#{ENV['CAFMAL_WORKER_DATASOURCE_ID']}"].limit = 1

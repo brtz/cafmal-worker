@@ -43,3 +43,4 @@ bower.json
 
 # our own
 env*.sh
+cafmalWorker.sh
