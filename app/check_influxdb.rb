@@ -6,7 +6,7 @@ class CheckInfluxdb < CheckInterface
     result = {}
 
     #@TODO username + pw support
-    client = InfluxDB::Client.new host: @address, username: @username, password: @password, database: @index
+    client = InfluxDB::Client.new host: @address, username: @username, password: @password, database: @index, retry: 5
 
     # prepare query
     query = @condition_query

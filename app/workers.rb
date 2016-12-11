@@ -125,7 +125,7 @@ class CafmalWorker
           event = Cafmal::Event.new(api_url, auth.token)
           params_to_e = {}
           params_to_e['team_id'] = check['team_id']
-          params_to_e['name'] = check['name']
+          params_to_e['name'] = check['category'] + '.' + check['name']
           params_to_e['message'] = result['message']
           params_to_e['kind'] = 'check'
           params_to_e['severity'] = check['severity']

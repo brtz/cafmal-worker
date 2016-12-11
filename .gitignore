@@ -40,3 +40,6 @@ bower.json
 
 # rbenv
 .ruby-version
+
+# our own
+env*.sh
