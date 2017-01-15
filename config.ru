@@ -2,10 +2,13 @@
 require 'sidekiq'
 
 Sidekiq.configure_client do |config|
+  redis_db = ENV["CAFMAL-WORKER_CACHE_DB"] || 0
+  redis_port = ENV["CAFMAL-WORKER_CACHE_PORT"] || 6379
+
   config.redis = {
     host: "redis" || ENV["CAFMAL-WORKER_CACHE_HOST"],
-    port: 6379 || ENV["CAFMAL-WORKER_CACHE_PORT"].to_i,
-    db: 0 || ENV["CAFMAL-WORKER_CACHE_DB"].to_i,
+    port: redis_port.to_i,
+    db: redis_db.to_i,
     password: "foobar" || ENV["CAFMAL-WORKER_CACHE_PASSWORD"],
     namespace: "worker"
   }
