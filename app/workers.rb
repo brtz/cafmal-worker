@@ -60,7 +60,7 @@ class CafmalWorker
       params_to_w['id'] = existing_worker_id
       create_worker_response = worker.update(params_to_w)
     end
-    logger.info "Registered worker (#{uuid},#{datasource_id}): #{JSON.parse(create_worker_response)['id']}"
+    logger.info "Registered worker (#{uuid}, datasource: #{datasource_id}): #{JSON.parse(create_worker_response)['id']}"
 
     # get all the checks
     check = Cafmal::Check.new(api_url, auth.token)
@@ -94,6 +94,7 @@ class CafmalWorker
       datasource_to_use = nil
       datasources.each do |datasource|
         if datasource['id'] == check['datasource_id']
+          next unless datasource['deleted_at'].nil?
           checktype = datasource['sourcetype']
           datasource_to_use = datasource
           break
