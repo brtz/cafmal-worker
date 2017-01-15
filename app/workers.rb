@@ -68,12 +68,10 @@ class CafmalWorker
 
     # filter
     checks.each do |check|
-      check['last_ran_at'] = DateTime.now.new_offset(0) if check['last_ran_at'].nil?
-
       next if check['datasource_id'] != datasource_id
       next unless check['deleted_at'].nil?
       next if check['is_locked']
-      next if DateTime.parse(check['last_ran_at']) + Rational(check['interval'], 86400) >= DateTime.now.new_offset(0)
+      next if DateTime.parse(check['updated_at']) + Rational(check['interval'], 86400) >= DateTime.now.new_offset(0)
       checks_to_run.push(check)
     end
 
@@ -151,7 +149,6 @@ class CafmalWorker
       end
 
       params['is_locked'] = false
-      params['last_ran_at'] = DateTime.now().new_offset(0)
       finished_run = check_res.update(params)
     end
 
@@ -171,7 +168,7 @@ Sidekiq::Cron::Job.create(
   name: "cafmalWorker-#{ENV['CAFMAL_WORKER_UUID']}",
   cron: '*/30 * * * * *',
   class: 'CafmalWorker',
-  queue: "cafmalQueue-#{ENV['CAFMAL_WORKER_DATASOURCE_ID']}",
+  queue: "cafmalQueue-worker-#{ENV['CAFMAL_WORKER_DATASOURCE_ID']}",
   args: {
     api_url: ENV['CAFMAL_API_URL'],
     uuid: ENV['CAFMAL_WORKER_UUID'],
