@@ -43,7 +43,7 @@ class CafmalWorker
     # register worker (update if already registered)
     existing_worker_id = nil
     worker = Cafmal::Worker.new(api_url, auth.token)
-    workers = JSON.parse(worker.list(api_url, auth.token))
+    workers = JSON.parse(worker.list.body)
     workers.each do |found_worker|
       if found_worker['uuid'] == uuid
         existing_worker_id = found_worker['id']
@@ -55,16 +55,16 @@ class CafmalWorker
     params_to_w['uuid'] = uuid
     params_to_w['heartbeat_received_at'] = DateTime.now.new_offset(0)
     if existing_worker_id.nil?
-      create_worker_response = worker.create(params_to_w)
+      create_worker_response = worker.create(params_to_w).body
     else
       params_to_w['id'] = existing_worker_id
-      create_worker_response = worker.update(params_to_w)
+      create_worker_response = worker.update(params_to_w).body
     end
     logger.info "Registered worker (#{uuid}, datasource: #{datasource_id}): #{JSON.parse(create_worker_response)['id']}"
 
     # get all the checks
     check = Cafmal::Check.new(api_url, auth.token)
-    checks = JSON.parse(check.list)
+    checks = JSON.parse(check.list.body)
 
     # filter
     checks.each do |check|
@@ -83,11 +83,11 @@ class CafmalWorker
       params = check
       params['is_locked'] = true
       check_res = Cafmal::Check.new(api_url, auth.token)
-      locked = check_res.update(params)
+      locked = check_res.update(params).body
 
       # run check itself
       datasource = Cafmal::Datasource.new(api_url, auth.token)
-      datasources = JSON.parse(datasource.list)
+      datasources = JSON.parse(datasource.list.body)
       checktype = nil
       datasource_to_use = nil
       datasources.each do |datasource|
@@ -131,7 +131,7 @@ class CafmalWorker
           params_to_e['severity'] = check['severity']
           params_to_e['metric'] = result['metric'].to_s
 
-          create_event_response = event.create(params_to_e)
+          create_event_response = event.create(params_to_e).body
           logger.info "Created new event: #{JSON.parse(create_event_response)['id']}"
         end
       rescue Exception => e
@@ -144,7 +144,7 @@ class CafmalWorker
         params_to_e['kind'] = 'check'
         params_to_e['severity'] = 'error'
 
-        create_event_response = event.create(params_to_e)
+        create_event_response = event.create(params_to_e).body
         logger.info "Created new event: #{JSON.parse(create_event_response)['id']}"
       end
 
