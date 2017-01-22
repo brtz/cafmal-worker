@@ -1,8 +1,6 @@
-require 'sidekiq'
-require 'sidekiq-cron'
-require 'sidekiq-limit_fetch'
 require 'cafmal'
 require 'json'
+require 'logger'
 
 # check required envs
 missing_env_vars = []
@@ -13,31 +11,18 @@ missing_env_vars.push('CAFMAL_WORKER_EMAIL') if ENV['CAFMAL_WORKER_EMAIL'].nil?
 missing_env_vars.push('CAFMAL_WORKER_PASSWORD') if ENV['CAFMAL_WORKER_PASSWORD'].nil?
 abort "Missing required env vars! (#{missing_env_vars.join(',')})" if missing_env_vars.length > 0
 
-Sidekiq.configure_server do |config|
-  redis_db = ENV["CAFMAL-WORKER_CACHE_DB"] || 0
-  redis_port = ENV["CAFMAL-WORKER_CACHE_PORT"] || 6379
-
-  config.redis = {
-    host: "redis" || ENV["CAFMAL-WORKER_CACHE_HOST"],
-    port: redis_port.to_i,
-    db: redis_db.to_i,
-    password: "foobar" || ENV["CAFMAL-WORKER_CACHE_PASSWORD"],
-    namespace: "worker"
-  }
-end
-
 class CafmalWorker
-  include Sidekiq::Worker
   require './app/check_elasticsearch'
   require './app/check_influxdb'
 
-  def perform(*args)
-    api_url = args[0]['api_url']
-    uuid = args[0]['uuid']
-    datasource_id = args[0]['datasource_id'].to_i
-    email = args[0]['email']
-    password = args[0]['password']
+  @logger = nil
 
+  def initialize(logger)
+    @logger = logger
+  end
+
+
+  def perform(api_url, uuid, datasource_id, email, password)
     checks_to_run = []
 
     auth = Cafmal::Auth.new(api_url)
@@ -63,7 +48,7 @@ class CafmalWorker
       params_to_w['id'] = existing_worker_id
       create_worker_response = worker.update(params_to_w).body
     end
-    logger.info "Registered worker (#{uuid}, datasource: #{datasource_id}): #{JSON.parse(create_worker_response)['id']}"
+    @logger.info "Registered worker (#{uuid}, datasource: #{datasource_id}): #{JSON.parse(create_worker_response)['id']}"
 
     # get all the checks
     check = Cafmal::Check.new(api_url, auth.token)
@@ -78,11 +63,11 @@ class CafmalWorker
       checks_to_run.push(check)
     end
 
-    logger.info "Checks to run:"
-    logger.info checks_to_run.to_json
+    @logger.info "Checks to run:"
+    @logger.info checks_to_run.to_json
 
     checks_to_run.each do |check|
-      logger.info "Going to run check: #{check['name']} from team: #{check['team_id']}"
+      @logger.info "Going to run check: #{check['name']} from team: #{check['team_id']}"
       params = check
       params['is_locked'] = true
       check_res = Cafmal::Check.new(api_url, auth.token)
@@ -103,12 +88,12 @@ class CafmalWorker
       end
 
       if checktype.nil?
-        logger.error 'Datasource type is not available!'
+        @logger.error 'Datasource type is not available!'
         next
       end
 
       begin
-        check_to_perform = ('Check' + checktype.capitalize).constantize.new(
+        check_to_perform = constantize('Check' + checktype.capitalize).new(
           datasource_to_use['address'],
           datasource_to_use['port'],
           datasource_to_use['protocol'],
@@ -122,7 +107,7 @@ class CafmalWorker
         )
         result = check_to_perform.execute
 
-        logger.info result
+        @logger.info result
 
         if result['bool']
           event = Cafmal::Event.new(api_url, auth.token)
@@ -135,10 +120,10 @@ class CafmalWorker
           params_to_e['metric'] = result['metric'].to_s
 
           create_event_response = event.create(params_to_e).body
-          logger.info "Created new event: #{JSON.parse(create_event_response)['id']}"
+          @logger.info "Created new event: #{JSON.parse(create_event_response)['id']}"
         end
       rescue Exception => e
-        logger.error "Check failed! #{check} | #{e.inspect}"
+        @logger.error "Check failed! #{check} | #{e.inspect}"
         event = Cafmal::Event.new(api_url, auth.token)
         params_to_e = {}
         params_to_e['team_id'] = check['team_id']
@@ -148,7 +133,7 @@ class CafmalWorker
         params_to_e['severity'] = 'error'
 
         create_event_response = event.create(params_to_e).body
-        logger.info "Created new event: #{JSON.parse(create_event_response)['id']}"
+        @logger.info "Created new event: #{JSON.parse(create_event_response)['id']}"
       end
 
       params['is_locked'] = false
@@ -167,18 +152,17 @@ class CafmalWorker
 
 end
 
-Sidekiq::Cron::Job.create(
-  name: "cafmalWorker-#{ENV['CAFMAL_WORKER_UUID']}",
-  cron: '*/30 * * * * *',
-  class: 'CafmalWorker',
-  queue: "cafmalQueue-worker-#{ENV['CAFMAL_WORKER_DATASOURCE_ID']}",
-  args: {
-    api_url: ENV['CAFMAL_API_URL'],
-    uuid: ENV['CAFMAL_WORKER_UUID'],
-    datasource_id: ENV['CAFMAL_WORKER_DATASOURCE_ID'],
-    email: ENV['CAFMAL_WORKER_EMAIL'],
-    password: ENV['CAFMAL_WORKER_PASSWORD']
-  }
-)
-
-Sidekiq::Queue["cafmalQueue-#{ENV['CAFMAL_WORKER_DATASOURCE_ID']}"].limit = 1
+logger = Logger.new(STDOUT)
+worker = CafmalWorker.new(logger)
+loop do
+  worker.perform(
+      ENV['CAFMAL_API_URL'],
+      ENV['CAFMAL_WORKER_UUID'],
+      ENV['CAFMAL_WORKER_DATASOURCE_ID'].to_i,
+      ENV['CAFMAL_WORKER_EMAIL'],
+      ENV['CAFMAL_WORKER_PASSWORD']
+  )
+  logger.info 'Sleeping for 30s'
+  STDOUT.flush
+  sleep(30)
+end

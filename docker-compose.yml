@@ -1,0 +1,21 @@
+# DEVELOPMENT ONLY!
+# do not use this in production!
+version: '2'
+services:
+  cafmal-worker-elasticsearch:
+    build: .
+    environment:
+      - CAFMAL_API_URL=http://lurkerden.no-ip.org:8080
+      - CAFMAL_WORKER_UUID=cw-datasource-1
+      - CAFMAL_WORKER_DATASOURCE_ID=1
+      - CAFMAL_WORKER_EMAIL=worker@example.com
+      - CAFMAL_WORKER_PASSWORD=barfoo
+
+  cafmal-worker-influxdb:
+    build: .
+    environment:
+      - CAFMAL_API_URL=http://lurkerden.no-ip.org:8080
+      - CAFMAL_WORKER_UUID=cw-datasource-2
+      - CAFMAL_WORKER_DATASOURCE_ID=2
+      - CAFMAL_WORKER_EMAIL=worker@example.com
+      - CAFMAL_WORKER_PASSWORD=barfoo
